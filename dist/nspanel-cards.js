@@ -41,7 +41,7 @@
  * move, so a swipe card wrapping these cards keeps working. See _onMove.
  */
 
-const NSPANEL_VERSION = '0.8.1';
+const NSPANEL_VERSION = '0.9.0';
 
 console.info(
   `%c NSPANEL-CARDS %c v${NSPANEL_VERSION} `,
@@ -2078,6 +2078,177 @@ class NsPanelButtonCard extends NsInfoCard {
 }
 
 /* ================================================================== *
+ * Switch card - things that are on or off
+ *
+ * The button card fires and forgets; this one reflects. A tile per
+ * switch, lit in the accent while it is on, and the tap is echoed at once
+ * so a slow round-trip never shows the old state under a finger.
+ * ================================================================== */
+
+const SWITCH_CSS = `
+.btn .st { font-size: 14px; line-height: 18px; color: var(--ns-muted); }
+.btn.on { background: var(--ns-accent-dim); }
+.btn.on ha-icon, .btn.on .bl { color: var(--ns-accent); }
+.pad[data-cols="3"] .btn .st { font-size: 13px; line-height: 16px; }
+`;
+
+/* What the entity picker offers, and what the card is for: anything whose
+   whole story is on or off. Lights have their own card. */
+const SWITCH_DOMAINS = ['switch', 'input_boolean', 'fan', 'automation', 'humidifier', 'siren', 'remote'];
+
+/* [on, off] icons by domain, for entities that carry none of their own */
+const SWITCH_ICONS = {
+  switch: ['mdi:toggle-switch-variant', 'mdi:toggle-switch-variant-off'],
+  input_boolean: ['mdi:toggle-switch-variant', 'mdi:toggle-switch-variant-off'],
+  fan: ['mdi:fan', 'mdi:fan-off'],
+  automation: ['mdi:robot', 'mdi:robot-off'],
+  humidifier: ['mdi:air-humidifier', 'mdi:air-humidifier-off'],
+  siren: ['mdi:bullhorn', 'mdi:bullhorn-outline'],
+  remote: ['mdi:remote', 'mdi:remote-off'],
+};
+
+class NsPanelSwitchCard extends NsInfoCard {
+  static get cardType() { return 'nspanel-switch-card'; }
+  static get extraCss() { return BUTTON_CSS + SWITCH_CSS; }
+  static get requiresEntity() { return false; }
+  static get accent() { return '#ffb74a'; }
+  static get defaultOptions() {
+    return {
+      switches: [], columns: 2, haptics: true, echo_ms: 1500,
+      on_text: 'On', off_text: 'Off', more_info: true,
+    };
+  }
+
+  get _columns() {
+    const cols = clamp(Math.round(this._config.columns) || 2, 1, 3);
+    return Math.max(1, Math.min(cols, this._items.length));
+  }
+
+  static getStubConfig(hass) {
+    const found = hass && hass.states
+      ? Object.keys(hass.states).find((e) => e.indexOf('switch.') === 0 ||
+          e.indexOf('input_boolean.') === 0)
+      : null;
+    return { entity: found || 'switch.example', height: 140 };
+  }
+
+  setConfig(config) {
+    super.setConfig(config);
+    if (!this._items.length) {
+      throw new Error(
+        `${this.constructor.cardType}: needs an "entity", or "switches" with at least one`);
+    }
+  }
+
+  /* One switch from `entity`, or a list from `switches`, like the button card. */
+  get _items() {
+    const cfg = this._config;
+    const list = Array.isArray(cfg.switches) && cfg.switches.length
+      ? cfg.switches
+      : (cfg.entity ? [{ entity: cfg.entity, name: cfg.title || cfg.name, icon: cfg.icon }] : []);
+    return list
+      .map((it) => (typeof it === 'string' ? { entity: it } : it))
+      .filter((it) => it && it.entity)
+      .slice(0, 6);
+  }
+
+  _entityIds() { return this._items.map((i) => i.entity); }
+
+  _teardown() {
+    (this._timers || []).forEach((t) => clearTimeout(t));
+    this._timers = [];
+  }
+
+  _later(fn, ms) {
+    this._timers = this._timers || [];
+    const t = setTimeout(fn, ms);
+    this._timers.push(t);
+    return t;
+  }
+
+  /* The state as shown: the tap's for echo_ms after it, then HA's. */
+  _isOn(b) {
+    if (b.local !== null && Date.now() < b.localUntil) return b.local;
+    b.local = null;
+    const s = this._state(b.item.entity);
+    return !!s && s.state === 'on';
+  }
+
+  _icon(b, on) {
+    if (b.item.icon) return b.item.icon;
+    const s = this._state(b.item.entity);
+    if (s && s.attributes && s.attributes.icon) return s.attributes.icon;
+    const pair = SWITCH_ICONS[b.item.entity.split('.')[0]] || SWITCH_ICONS.switch;
+    return on ? pair[0] : pair[1];
+  }
+
+  /* turn_on / turn_off rather than toggle: with the echo, the tap says what it
+     wants, and two quick taps cannot race the round-trip into the wrong state. */
+  _press(b) {
+    if (this._config.haptics) haptic(this, 'light');
+    const on = !this._isOn(b);
+    b.local = on;
+    b.localUntil = Date.now() + this._config.echo_ms;
+    if (this._hass) {
+      this._hass.callService('homeassistant', on ? 'turn_on' : 'turn_off',
+        { entity_id: b.item.entity });
+    }
+    this._scheduleRender();
+    this._later(() => this._scheduleRender(), this._config.echo_ms + 20);
+  }
+
+  _build() {
+    if (this._built || !this._config) return;
+    this._built = true;
+    this.shadowRoot.innerHTML = `
+      ${this._shell()}
+        <div class="content"><div class="pad"></div></div>
+      </div>
+    `;
+    this._card = this.shadowRoot.querySelector('.card');
+    const pad = this.shadowRoot.querySelector('.pad');
+    pad.style.setProperty('--ns-cols', String(this._columns));
+    pad.setAttribute('data-cols', String(this._columns));
+
+    this._btns = this._items.map((item) => {
+      const el = document.createElement('button');
+      el.className = 'btn';
+      el.innerHTML = '<ha-icon></ha-icon><div class="bl"></div><div class="st"></div>';
+      const b = {
+        item, el,
+        icon: el.querySelector('ha-icon'),
+        label: el.querySelector('.bl'),
+        state: el.querySelector('.st'),
+        local: null,
+        localUntil: 0,
+      };
+      el.addEventListener('click', () => this._press(b));
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (this._config.more_info) moreInfo(this, item.entity);
+      });
+      pad.appendChild(el);
+      return b;
+    });
+  }
+
+  _render() {
+    if (!this._btns) return;
+    this._btns.forEach((b) => {
+      const s = this._state(b.item.entity);
+      const broken = !s || s.state === 'unavailable';
+      const on = !broken && this._isOn(b);
+      b.el.classList.toggle('on', on);
+      if (broken) b.el.setAttribute('disabled', ''); else b.el.removeAttribute('disabled');
+      b.icon.setAttribute('icon', broken ? 'mdi:alert-circle-outline' : this._icon(b, on));
+      b.label.textContent = b.item.name || friendly(s, b.item.entity);
+      b.state.textContent = broken ? 'Unavailable'
+        : (on ? this._config.on_text : this._config.off_text);
+    });
+  }
+}
+
+/* ================================================================== *
  * Alarm card - arm and disarm, with the keypad when HA wants a code
  *
  * Disarmed shows a button per mode; anything else shows Disarm. The state
@@ -3590,6 +3761,32 @@ class NsPanelProbeCard extends HTMLElement {
 
 const EDITOR_LABELS = {
   entity: 'Entity',
+  presets: 'Presets',
+  entities: 'Entities',
+  buttons: 'Buttons',
+  switches: 'Switches',
+  severity: 'Severity colours',
+  name: 'Name',
+  brightness_pct: 'Brightness (%)',
+  color_temp_kelvin: 'Colour temperature (K)',
+  rgb_color: 'Colour',
+  effect: 'Effect',
+  scene: 'Scene',
+  position: 'Position (%)',
+  temperature: 'Temperature',
+  hvac_mode: 'HVAC mode',
+  preset_mode: 'Preset mode',
+  source: 'Source',
+  media_content_id: 'Media id',
+  media_content_type: 'Media type',
+  volume_pct: 'Volume (%)',
+  service: 'Service (instead of the entity\'s own)',
+  data: 'Service data',
+  problem_when: 'Problem when the state is',
+  above: 'Above',
+  color: 'Colour (hex)',
+  on_text: 'Text while on',
+  off_text: 'Text while off',
   title: 'Title',
   icon: 'Icon',
   height: 'Height (px)',
@@ -3628,8 +3825,45 @@ const EDITOR_LABELS = {
   feedback_ms: 'Hold the tick for (ms)',
   modes: 'Arm buttons',
   sounds: 'Sounds on the panel app',
-  haptics: 'Haptics',
 };
+
+/* A list of objects, drawn by HA's object selector: one row per item with
+   add, edit and delete, and a form per item built from `fields`. Keys an
+   item carries that are not fields survive the card editor (it only merges
+   the form's value over the config) but not the item's own dialog, so every
+   documented key is a field. */
+function listOf(fields, labelField, descField) {
+  const sel = { multiple: true, fields };
+  if (labelField) sel.label_field = labelField;
+  if (descField) sel.description_field = descField;
+  return { object: sel };
+}
+
+const NAME_FIELD = { name: { required: true, selector: { text: {} } } };
+const PRESET_FIELDS = {
+  light: Object.assign({}, NAME_FIELD, {
+    brightness_pct: { selector: { number: { min: 1, max: 100, step: 1, mode: 'box' } } },
+    color_temp_kelvin: { selector: { number: { min: 1500, max: 7000, step: 50, mode: 'box' } } },
+    rgb_color: { selector: { color_rgb: {} } },
+    effect: { selector: { text: {} } },
+    scene: { selector: { entity: { domain: 'scene' } } },
+  }),
+  cover: Object.assign({}, NAME_FIELD, {
+    position: { required: true, selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
+  }),
+  climate: Object.assign({}, NAME_FIELD, {
+    temperature: { selector: { number: { min: 4, max: 35, step: 0.5, mode: 'box' } } },
+    hvac_mode: { selector: { text: {} } },
+    preset_mode: { selector: { text: {} } },
+  }),
+  media: Object.assign({}, NAME_FIELD, {
+    source: { selector: { text: {} } },
+    media_content_id: { selector: { text: {} } },
+    media_content_type: { selector: { text: {} } },
+    volume_pct: { selector: { number: { min: 0, max: 100, step: 1, mode: 'box' } } },
+  }),
+};
+const ENTITY_FIELD = { entity: { required: true, selector: { entity: {} } } };
 
 /* The options every card takes. The entity row is prepended per card, because
    its picker is filtered to that card's domain. */
@@ -3672,10 +3906,7 @@ class NsBaseCardEditor extends HTMLElement {
   static get hasEntityRow() { return true; }
   static get entityRequired() { return true; }
   static get domain() { return null; }
-  static get note() {
-    return 'Presets are a list, which this form cannot draw. Edit them in YAML - ' +
-      'the GUI leaves them alone.';
-  }
+  static get note() { return ''; }
 
   constructor() {
     super();
@@ -3721,12 +3952,18 @@ class NsBaseCardEditor extends HTMLElement {
 
   /* `name` was the old spelling of `title`. Show it in the title box so the
      value is not invisible in the GUI; writing back stores `title`. */
+  /* Lists that accept a bare entity id (`- sensor.x`) are shown as objects,
+     which is what the list control edits; writing back stores objects. */
   _push() {
     const c = this._config;
     this._form.schema = this._schema;
-    this._form.data = Object.assign({}, c, {
-      title: c.title || c.name || '',
+    const data = Object.assign({}, c, { title: c.title || c.name || '' });
+    ['entities', 'buttons', 'switches'].forEach((k) => {
+      if (Array.isArray(c[k])) {
+        data[k] = c[k].map((it) => (typeof it === 'string' ? { entity: it } : it));
+      }
     });
+    this._form.data = data;
   }
 
   _valueChanged(e) {
@@ -3759,6 +3996,7 @@ class NsPanelLightCardEditor extends NsBaseCardEditor {
 class NsPanelCoverCardEditor extends NsBaseCardEditor {
   static get cardType() { return 'nspanel-cover-card'; }
   static get domain() { return 'cover'; }
+  static get rows() { return COVER_SCHEMA; }
 }
 
 
@@ -3786,13 +4024,34 @@ const SENSOR_SCHEMA = INFO_SCHEMA.concat([
     ],
   },
   { name: 'bar', selector: { boolean: {} } },
+  {
+    name: 'severity', selector: listOf({
+      above: { required: true, selector: { number: { mode: 'box' } } },
+      color: { required: true, selector: { text: {} } },
+    }, 'color', 'above'),
+  },
 ]);
 
 const SENSORS_SCHEMA = INFO_SCHEMA.concat([
+  {
+    name: 'entities', selector: listOf(Object.assign({}, ENTITY_FIELD, {
+      name: { selector: { text: {} } },
+      icon: { selector: { icon: {} } },
+      unit: { selector: { text: {} } },
+      decimals: { selector: { number: { min: 0, max: 4, step: 1, mode: 'box' } } },
+    }), 'name', 'entity'),
+  },
   { name: 'show_icons', selector: { boolean: {} } },
 ]);
 
 const STATUS_SCHEMA = INFO_SCHEMA.concat([
+  {
+    name: 'entities', selector: listOf(Object.assign({}, ENTITY_FIELD, {
+      name: { selector: { text: {} } },
+      icon: { selector: { icon: {} } },
+      problem_when: { selector: { text: { multiple: true } } },
+    }), 'name', 'entity'),
+  },
   {
     name: '', type: 'grid', schema: [
       { name: 'only_problems', selector: { boolean: {} } },
@@ -3840,6 +4099,7 @@ const CLOCK_SCHEMA = [
 /* The climate card is a control card, so it takes the control options plus a
    range of its own. */
 const CLIMATE_SCHEMA = SHARED_SCHEMA.concat([
+  { name: 'presets', selector: listOf(PRESET_FIELDS.climate, 'name', 'temperature') },
   {
     name: '', type: 'grid', schema: [
       { name: 'min', selector: { number: { min: 4, max: 35, step: 0.5, mode: 'box' } } },
@@ -3851,12 +4111,18 @@ const CLIMATE_SCHEMA = SHARED_SCHEMA.concat([
 
 /* The light card is the only one whose accent can come from the entity. */
 const LIGHT_SCHEMA = SHARED_SCHEMA.concat([
+  { name: 'presets', selector: listOf(PRESET_FIELDS.light, 'name', 'brightness_pct') },
   { name: 'follow_color', selector: { boolean: {} } },
+]);
+
+const COVER_SCHEMA = SHARED_SCHEMA.concat([
+  { name: 'presets', selector: listOf(PRESET_FIELDS.cover, 'name', 'position') },
 ]);
 
 /* The media card is a control card, minus the options that make no sense for
    one: there are no levels to preset by dragging, and no ± step worth a row. */
 const MEDIA_SCHEMA = SHARED_SCHEMA.concat([
+  { name: 'presets', selector: listOf(PRESET_FIELDS.media, 'name', 'source') },
   {
     name: '', type: 'grid', schema: [
       { name: 'show_art', selector: { boolean: {} } },
@@ -3866,8 +4132,8 @@ const MEDIA_SCHEMA = SHARED_SCHEMA.concat([
   },
 ]);
 
-/* The button card's entity row is the one-button shorthand; a list of buttons
-   is YAML, like every other list here. */
+/* The button card's entity row is the one-button shorthand; several buttons
+   go in the list, which then wins over the entity row. */
 const BUTTON_SCHEMA = [
   { name: 'title', selector: { text: {} } },
   {
@@ -3878,6 +4144,17 @@ const BUTTON_SCHEMA = [
   },
   { name: 'accent', selector: { text: {} } },
   {
+    name: 'buttons', selector: listOf({
+      entity: { selector: { entity: {} } },
+      name: { selector: { text: {} } },
+      icon: { selector: { icon: {} } },
+      confirm: { selector: { boolean: {} } },
+      confirm_text: { selector: { text: {} } },
+      service: { selector: { text: {} } },
+      data: { selector: { object: {} } },
+    }, 'name', 'entity'),
+  },
+  {
     name: '', type: 'grid', schema: [
       { name: 'columns', selector: { number: { min: 1, max: 3, step: 1, mode: 'box' } } },
       { name: 'feedback_ms', selector: { number: { min: 0, max: 5000, step: 100, mode: 'box' } } },
@@ -3887,6 +4164,38 @@ const BUTTON_SCHEMA = [
     ],
   },
   { name: 'confirm_text', selector: { text: {} } },
+];
+
+const SWITCH_SCHEMA = [
+  { name: 'title', selector: { text: {} } },
+  {
+    name: '', type: 'grid', schema: [
+      { name: 'icon', selector: { icon: {} } },
+      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+    ],
+  },
+  { name: 'accent', selector: { text: {} } },
+  {
+    name: 'switches', selector: listOf({
+      entity: { required: true, selector: { entity: { domain: SWITCH_DOMAINS } } },
+      name: { selector: { text: {} } },
+      icon: { selector: { icon: {} } },
+    }, 'name', 'entity'),
+  },
+  {
+    name: '', type: 'grid', schema: [
+      { name: 'columns', selector: { number: { min: 1, max: 3, step: 1, mode: 'box' } } },
+      { name: 'echo_ms', selector: { number: { min: 0, max: 5000, step: 100, mode: 'box' } } },
+      { name: 'haptics', selector: { boolean: {} } },
+      { name: 'more_info', selector: { boolean: {} } },
+    ],
+  },
+  {
+    name: '', type: 'grid', schema: [
+      { name: 'on_text', selector: { text: {} } },
+      { name: 'off_text', selector: { text: {} } },
+    ],
+  },
 ];
 
 const ALARM_SCHEMA = [
@@ -3915,8 +4224,7 @@ const ALARM_SCHEMA = [
   },
 ];
 
-const LIST_NOTE = 'Entities are a list, which this form cannot draw. Edit them in ' +
-  'YAML - the GUI leaves them alone.';
+const LIST_NOTE = '';
 
 class NsPanelClimateCardEditor extends NsBaseCardEditor {
   static get cardType() { return 'nspanel-climate-card'; }
@@ -3929,8 +4237,17 @@ class NsPanelMediaCardEditor extends NsBaseCardEditor {
   static get domain() { return 'media_player'; }
   static get rows() { return MEDIA_SCHEMA; }
   static get note() {
-    return 'Presets on this card are favourites - a source, or a media id to play. ' +
-      'They are a list, so edit them in YAML; the GUI leaves them alone.';
+    return 'Presets are favourites: a source to select, or a media id to play.';
+  }
+}
+
+class NsPanelSwitchCardEditor extends NsBaseCardEditor {
+  static get cardType() { return 'nspanel-switch-card'; }
+  static get entityRequired() { return false; }
+  static get domain() { return SWITCH_DOMAINS; }
+  static get rows() { return SWITCH_SCHEMA; }
+  static get note() {
+    return 'One switch: pick the entity. Several: add them under Switches, which then wins.';
   }
 }
 
@@ -3957,10 +4274,7 @@ class NsPanelAlarmCardEditor extends NsBaseCardEditor {
 class NsPanelSensorCardEditor extends NsBaseCardEditor {
   static get cardType() { return 'nspanel-sensor-card'; }
   static get rows() { return SENSOR_SCHEMA; }
-  static get note() {
-    return 'Severity colours are a list, which this form cannot draw. Edit them ' +
-      'in YAML - the GUI leaves them alone.';
-  }
+  static get note() { return 'Severity colours: the last one whose "above" the value passes wins.'; }
 }
 
 class NsPanelSensorsCardEditor extends NsBaseCardEditor {
@@ -4026,6 +4340,7 @@ customElements.define('nspanel-probe-card', NsPanelProbeCard);
 customElements.define('nspanel-climate-card', NsPanelClimateCard);
 customElements.define('nspanel-media-card', NsPanelMediaCard);
 customElements.define('nspanel-button-card', NsPanelButtonCard);
+customElements.define('nspanel-switch-card', NsPanelSwitchCard);
 customElements.define('nspanel-alarm-card', NsPanelAlarmCard);
 customElements.define('nspanel-sensor-card', NsPanelSensorCard);
 customElements.define('nspanel-sensors-card', NsPanelSensorsCard);
@@ -4039,6 +4354,7 @@ customElements.define('nspanel-cover-card-editor', NsPanelCoverCardEditor);
 customElements.define('nspanel-climate-card-editor', NsPanelClimateCardEditor);
 customElements.define('nspanel-media-card-editor', NsPanelMediaCardEditor);
 customElements.define('nspanel-button-card-editor', NsPanelButtonCardEditor);
+customElements.define('nspanel-switch-card-editor', NsPanelSwitchCardEditor);
 customElements.define('nspanel-alarm-card-editor', NsPanelAlarmCardEditor);
 customElements.define('nspanel-sensor-card-editor', NsPanelSensorCardEditor);
 customElements.define('nspanel-sensors-card-editor', NsPanelSensorsCardEditor);
@@ -4076,6 +4392,12 @@ window.customCards.push(
     type: 'nspanel-button-card',
     name: 'NSPanel Button',
     description: 'Scenes, scripts and automations. Big targets, and it tells you the tap landed.',
+    preview: true,
+  },
+  {
+    type: 'nspanel-switch-card',
+    name: 'NSPanel Switch',
+    description: 'Switches, input booleans, fans: on or off, lit while on, echoed at the tap.',
     preview: true,
   },
   {
@@ -4140,6 +4462,8 @@ window.NsPanelCards = {
   NsPanelClimateCard,
   NsPanelMediaCard,
   NsPanelButtonCard,
+  NsPanelSwitchCard,
+  NsPanelAlarmCard,
   NsPanelSensorCard,
   NsPanelSensorsCard,
   NsPanelStatusCard,
@@ -4151,6 +4475,8 @@ window.NsPanelCards = {
   NsPanelClimateCardEditor,
   NsPanelMediaCardEditor,
   NsPanelButtonCardEditor,
+  NsPanelSwitchCardEditor,
+  NsPanelAlarmCardEditor,
   NsPanelSensorCardEditor,
   NsPanelSensorsCardEditor,
   NsPanelStatusCardEditor,

@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-A HACS-installable Lovelace plugin: twelve custom cards (plus one config-only element) for
+A HACS-installable Lovelace plugin: thirteen custom cards (plus one config-only element) for
 the **Sonoff NSPanel Pro 86** (square 480×480 wall panel, Rockchip PX30 / 2 GB / Mali-G31,
 Android 8.1). Distributed as a single JavaScript file that Home Assistant loads as a module
 resource. The same card configs are rendered natively by the sibling Flutter app.
@@ -18,7 +18,9 @@ Cards, in two families:
   `nspanel-status-card`, `nspanel-weather-card`, `nspanel-clock-card`. Read-only, often several
   entities, tap opens more-info.
 - **Actions** (`NsInfoCard` too, since it needs the multi-entity diff and the timers but no
-  drag): `nspanel-button-card`. Scenes, scripts, automations. And `nspanel-alarm-card`:
+  drag): `nspanel-button-card`. Scenes, scripts, automations. `nspanel-switch-card`: the
+  same grid for switches, input booleans and fans, but reflecting state, with the tap
+  echoed for `echo_ms` (turn_on/turn_off, never toggle). And `nspanel-alarm-card`:
   arm/disarm with a keypad (`ns-keypad`) when the entity has a `code_format`.
 - `nspanel-probe-card` is neither — a standalone diagnostics element.
 
@@ -56,8 +58,8 @@ powershell -NoProfile -File dev/shots.ps1
 ```
 
 `dev/bench.html?shot=<id>` is the bare 480x480 capture mode the script drives - ids are
-`light`, `cover`, `sheet`, `climate`, `media`, `info`, `scenes`, `status`, `sky`, one per
-panel in the bench.
+`light`, `cover`, `sheet`, `climate`, `media`, `info`, `scenes`, `alarm`, `switches`,
+`status`, `sky`, one per panel in the bench.
 Loading `dev/bench.html` with no query string gives the whole rack for eyeballing changes.
 
 HA's `ha-icon` does not exist outside HA. `kiosk/icons.js` defines it (only if nothing else
@@ -149,8 +151,12 @@ Ordered top to bottom, separated by banner comments:
 
 Miss (3) and the GUI silently drops the option from any card the user edits. `dev/editor.html`
 prints a sync check comparing (1) against (3) for **every** card - open it after touching
-options; all ten rows should say `ok`. The exempt keys are the ones `ha-form` cannot draw:
-`presets`, `entities`, `severity`, `buttons`, and the legacy `name`.
+options (`python dev/serve.py 8177`, then headless Chrome `--dump-dom` on
+`http://localhost:8177/dev/editor.html`); all twelve rows should say `ok`. Only the legacy
+`name` is exempt. Lists of objects (`presets`, `entities`, `buttons`, `switches`, `severity`)
+are drawn by HA's object selector - `listOf(fields, labelField, descField)` - which shows one
+row per item and a form per item built from `fields`; a key of an item that is not a field
+is lost when that item is edited in its dialog, so every documented per-item key is a field.
 - Comments explain *why*, in prose, at the point where the reasoning is non-obvious. Match
   that density — this file is written to be read.
 - Single quotes, semicolons, 2-space indent, ~90 column soft wrap.

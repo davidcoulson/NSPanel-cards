@@ -57,6 +57,10 @@
     'script.leaving': st('script.leaving', 'off', { friendly_name: 'Leaving' }),
     'scene.movie': st('scene.movie', 'unknown', { friendly_name: 'Movie' }),
     // arms without a code, disarms with 1234 and refuses anything else
+    'switch.garden_lights': st('switch.garden_lights', 'on', { friendly_name: 'Garden lights' }),
+    'switch.fountain': st('switch.fountain', 'off', { friendly_name: 'Fountain' }),
+    'input_boolean.guest_mode': st('input_boolean.guest_mode', 'on', { friendly_name: 'Guest mode' }),
+    'fan.bedroom': st('fan.bedroom', 'off', { friendly_name: 'Bedroom fan' }),
     'alarm_control_panel.home': st('alarm_control_panel.home', 'disarmed', {
       friendly_name: 'Home Alarm', code_format: 'number', code_arm_required: false,
       supported_features: 7, changed_by: null,
@@ -99,8 +103,10 @@
       }, 2500);
     } else if (domain === 'scene') {
       s.state = now();
-    } else if (domain === 'homeassistant' && service === 'toggle') {
-      s.state = s.state === 'on' ? 'off' : 'on';
+    } else if (['homeassistant', 'switch', 'input_boolean', 'fan'].indexOf(domain) >= 0) {
+      if (service === 'toggle') s.state = s.state === 'on' ? 'off' : 'on';
+      if (service === 'turn_on') s.state = 'on';
+      if (service === 'turn_off') s.state = 'off';
     } else if (domain === 'alarm_control_panel') {
       if (service === 'alarm_disarm') {
         if (data.code !== '1234') return { error: { code: 'invalid_code', message: 'Invalid alarm code provided' } };

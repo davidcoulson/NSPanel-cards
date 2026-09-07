@@ -44,6 +44,7 @@ It starts with installing these cards.
 | Card | What it does |
 | --- | --- |
 | `custom:nspanel-button-card` | Scenes, scripts, automations. One big button, or up to six in a 1–3 column grid. Tells you the tap landed, and can ask twice before doing something drastic. |
+| `custom:nspanel-switch-card` | Switches, input booleans, fans: the same grid, but each tile reflects its entity — lit while on — and a tap turns it the other way, echoed at once. |
 | `custom:nspanel-alarm-card` | Arm and disarm an alarm. A button per mode, one Disarm when it is set, and a full-screen keypad when the alarm wants a code. |
 
 **Information** — read-only, tap opens Home Assistant's own more-info dialog:
@@ -101,7 +102,7 @@ That rules out `color-mix()` and CSS nesting; neither is used.
 ### Manual
 
 1. Copy `dist/nspanel-cards.js` to `/config/www/nspanel-cards.js`
-2. Settings → Dashboards → ⋮ → Resources → `/local/nspanel-cards.js?v=0.8.1`, type
+2. Settings → Dashboards → ⋮ → Resources → `/local/nspanel-cards.js?v=0.9.0`, type
    **JavaScript module**
 
 Home Assistant caches `/local/` hard. Bump the `?v=` when you update, or you will be looking at
@@ -113,10 +114,11 @@ Every card has a **visual editor** — add one from the dashboard's card picker,
 pencil on an existing card, and you get HA's own controls: entity picker, icon picker,
 switches, the lot. Every option in the tables below is in there.
 
-The lists are the exception: `presets`, `entities`, `buttons` and `severity` are lists of
-objects, and HA's form builder has no control for those, so they stay in YAML — the editor
-leaves them untouched, so opening the GUI on a card with hand-written presets will not eat
-them. (The probe card and the screensaver card have no editor.)
+The lists too: `presets`, `entities`, `buttons`, `switches` and `severity` are lists of
+objects, and current Home Assistant draws those as a list with add, edit and delete and a
+small form per item — an entity picker, a name, an icon. An older Home Assistant shows the
+same field as a YAML box. Either way the editor never eats what you wrote by hand: it only
+writes the fields it knows. (The probe card and the screensaver card have no editor.)
 
 ### Light
 
@@ -370,6 +372,62 @@ the scene did not do what you expected.
 | `more_info` | `true` | long-press opens the dialog |
 
 Per button: `entity`, `name`, `icon`, `service`, `data`, `confirm`, `confirm_text`.
+
+### Switches
+
+<table>
+<tr>
+<td valign="top">
+
+```yaml
+type: custom:nspanel-switch-card
+height: 300
+columns: 2
+switches:
+  - entity: switch.garden_lights
+    name: Garden
+    icon: mdi:flower
+  - entity: switch.fountain
+    name: Fountain
+  - entity: input_boolean.guest_mode
+    name: Guest mode
+    icon: mdi:account-group
+  - entity: fan.bedroom
+    name: Bedroom fan
+```
+
+</td>
+<td><img src="docs/images/switches.png" alt="A four-tile switch grid: Garden and Guest mode lit amber and marked On, Fountain and Bedroom fan dim and marked Off; below it a three-across row with one tile greyed out as unavailable" width="300"></td>
+</tr>
+</table>
+
+For one switch, skip the list: `entity: switch.garden_lights` with `title` and `icon`, as on
+the button card.
+
+The button card fires and forgets; this one reflects. Each tile is lit in the accent while its
+entity is `on`, with the state written under the name, and a tap turns it the other way. The
+tap is echoed at once: the tile shows the new state for `echo_ms` before Home Assistant
+answers, so a slow round-trip never shows the old state under a finger. The card calls
+`homeassistant.turn_on` or `turn_off` for what the tap wants rather than `toggle`, so two
+quick taps cannot race each other into the wrong state.
+
+It takes anything whose whole story is on or off: `switch`, `input_boolean`, `fan`,
+`automation` (enabled or not), `humidifier`, `siren`, `remote`. Lights have their own card,
+with a level. Icons are the entity's own, or per domain — a toggle for switches and booleans,
+a fan, a robot — in the off variant while off. An entity that is missing or `unavailable` is
+greyed out and says so. A long-press opens more-info.
+
+| Option | Default | |
+| --- | --- | --- |
+| `switches` | — | up to 6; `entity` alone is the one-switch shorthand |
+| `columns` | `2` | 1–3, capped at the number of switches; a row is always shared |
+| `echo_ms` | `1500` | how long the tap's state outranks Home Assistant's |
+| `on_text` | `On` | the line under the name while on |
+| `off_text` | `Off` | the line under the name while off |
+| `haptics` | `true` | |
+| `more_info` | `true` | long-press opens the dialog |
+
+Per switch: `entity`, `name`, `icon`.
 
 ### Alarm
 

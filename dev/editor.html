@@ -135,9 +135,9 @@ window.__editor = ed;
  * says out loud when the two lists have drifted apart. Run this after
  * touching options on any card.
  * ------------------------------------------------------------------ */
-/* The keys ha-form has no control for: lists of objects, and the legacy alias
-   of title. Everything else must have a row. */
-const EDITOR_EXEMPT = ['type', 'name', 'presets', 'entities', 'severity', 'buttons'];
+/* Only the type and the legacy alias of title are exempt: since HA's object
+   selector draws lists of objects, every list has a row too. */
+const EDITOR_EXEMPT = ['type', 'name'];
 
 const ALL_CARDS = [
   ['nspanel-light-card', 'light.dining_lights'],
@@ -145,6 +145,7 @@ const ALL_CARDS = [
   ['nspanel-climate-card', 'climate.living'],
   ['nspanel-media-card', 'media_player.kitchen'],
   ['nspanel-button-card', 'script.goodnight'],
+  ['nspanel-switch-card', 'switch.garden_lights'],
   ['nspanel-alarm-card', 'alarm_control_panel.home'],
   ['nspanel-sensor-card', 'sensor.co2'],
   ['nspanel-sensors-card', null],

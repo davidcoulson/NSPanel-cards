@@ -103,6 +103,26 @@ window.NSPANEL_CONFIG = {
     {
       cards: [
         {
+          type: 'nspanel-switch-card',
+          height: 300,
+          columns: 2,
+          switches: [
+            { entity: 'switch.garden_lights', name: 'Garden', icon: 'mdi:flower' },
+            { entity: 'switch.fountain', name: 'Fountain' },
+            { entity: 'input_boolean.guest_mode', name: 'Guest mode', icon: 'mdi:account-group' },
+            { entity: 'fan.bedroom', name: 'Bedroom fan' },
+          ],
+        },
+        {
+          type: 'nspanel-clock-card',
+          height: 144,
+          show_date: true,
+        },
+      ],
+    },
+    {
+      cards: [
+        {
           type: 'nspanel-alarm-card',
           entity: 'alarm_control_panel.home',
           title: 'Alarm',

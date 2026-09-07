@@ -77,6 +77,10 @@
     <div class="cap">alarm - disarmed with three modes, and armed away</div>
   </div>
   <div>
+    <div class="panel" id="p-switches"><div class="stack" id="s-switches"></div></div>
+    <div class="cap">switches - lit while on; three across below, one of them unavailable</div>
+  </div>
+  <div>
     <div class="panel" id="p-status"><div class="stack" id="s-status"></div></div>
     <div class="cap">Status</div>
   </div>
@@ -193,6 +197,11 @@ const hass = {
           '<circle cx="112" cy="48" r="26" fill="rgba(255,255,255,.35)"/></svg>'),
         supported_features: 1 | 4 | 16 | 32 | 4096 | 16384 }),
 
+    'switch.garden_lights': st('switch.garden_lights', 'on', { friendly_name: 'Garden lights' }),
+    'switch.fountain': st('switch.fountain', 'off', { friendly_name: 'Fountain' }),
+    'input_boolean.guest_mode': st('input_boolean.guest_mode', 'on', { friendly_name: 'Guest mode' }),
+    'fan.bedroom': st('fan.bedroom', 'off', { friendly_name: 'Bedroom fan' }),
+    'switch.dead': st('switch.dead', 'unavailable', { friendly_name: 'Pond pump' }),
     'alarm_control_panel.home': st('alarm_control_panel.home', 'disarmed',
       { friendly_name: 'Home Alarm', code_format: 'number', code_arm_required: false,
         supported_features: 7 }),
@@ -348,6 +357,21 @@ card('nspanel-alarm-card', {
 card('nspanel-alarm-card', {
   entity: 'alarm_control_panel.armed', title: 'Alarm', height: 200,
 }, document.getElementById('s-alarm'));
+
+card('nspanel-switch-card', {
+  height: 300, columns: 2,
+  switches: [
+    { entity: 'switch.garden_lights', name: 'Garden', icon: 'mdi:flower' },
+    { entity: 'switch.fountain', name: 'Fountain' },
+    { entity: 'input_boolean.guest_mode', name: 'Guest mode', icon: 'mdi:account-group' },
+    { entity: 'fan.bedroom', name: 'Bedroom fan' },
+  ],
+}, document.getElementById('s-switches'));
+
+card('nspanel-switch-card', {
+  height: 144, columns: 3,
+  switches: ['switch.garden_lights', 'input_boolean.guest_mode', 'switch.dead'],
+}, document.getElementById('s-switches'));
 
 card('nspanel-status-card', {
   title: 'House', height: 444,

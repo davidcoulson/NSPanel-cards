@@ -20,12 +20,16 @@
   }
   /* The bench pins CSS pixels to the panel's own, so what you see here is what
      fits on the glass. ?panel=<id> picks which glass: the Pro 86 is 480x480 and
-     the default, the Pro 120 is taller and rotates. The 120's CSS viewport is
-     its 750x1334 screen at devicePixelRatio 2 - run nspanel-probe-card on the
-     device and trust that over this. */
+     the default, the Pro 120 is bigger both ways and rotates.
+
+     The 120 numbers are its 750x1334 screen at the factory density of 240, i.e.
+     devicePixelRatio 1.5. Density is the whole story here and it is not fixed -
+     a unit measured at an override of 280 (dpr 1.75) reported screen 763x429 in
+     landscape instead. Run nspanel-probe-card on your own panel and trust that
+     over any of these. */
   :root { --panel-w: 480px; --panel-h: 480px; }
-  body[data-panel="120"]  { --panel-w: 375px; --panel-h: 667px; }
-  body[data-panel="120l"] { --panel-w: 667px; --panel-h: 375px; }
+  body[data-panel="120"]  { --panel-w: 500px; --panel-h: 889px; }
+  body[data-panel="120l"] { --panel-w: 889px; --panel-h: 500px; }
   .panel {
     width: var(--panel-w);
     height: var(--panel-h);
@@ -60,8 +64,8 @@
 <div class="sizes">
   <span>panel:</span>
   <a href="?">Pro 86 · 480×480</a>
-  <a href="?panel=120">Pro 120 · 375×667</a>
-  <a href="?panel=120l">Pro 120 landscape · 667×375</a>
+  <a href="?panel=120">Pro 120 · 500×889</a>
+  <a href="?panel=120l">Pro 120 landscape · 889×500</a>
 </div>
 
 <div class="rack">

@@ -653,7 +653,7 @@ every minute; the panel can take it, but it is one more thing running.
 | `title` | the entity's friendly name | what the card calls it |
 | `name` | — | the older spelling of `title`; still works |
 | `icon` | domain default | |
-| `height` | `200` | card height in px; the editor's spinner stops at 660, YAML does not |
+| `height` | `200` | card height in px; the editor's spinner stops at 900, YAML does not |
 | `accent` | amber / sky | any hex |
 | `presets` | 3 sensible ones | max 4 shown on the card |
 | `show_presets` | `true` | |
@@ -814,31 +814,44 @@ has no more-info dialog, and knows nothing about the rest of Home Assistant.
 
 ## Sizing for your panel
 
-**Measure first.** The panel's physical resolution is not the number the page gets: Android
-density decides how many **CSS** pixels a card is laid out in, and the panels do not ship at
-160 dpi. Drop `custom:nspanel-probe-card` on a dashboard once and read `viewport` and `panel`
-straight off the glass, then set `height` to suit. Delete it afterwards; it is a tool, not
-furniture.
+**Measure first.** A panel's physical resolution is not the number your cards are laid out in.
+Android density decides how many **CSS** pixels the page gets, neither panel ships at 160 dpi,
+and density is the single biggest variable here — bigger than which panel you own. Drop
+`custom:nspanel-probe-card` on a dashboard once, read `viewport` and `panel` straight off the
+glass, then set `height` to suit. Delete it afterwards; it is a tool, not furniture.
 
 On the **Pro 86**, stock density is commonly changed with `adb shell wm density 148` (with
 kiosk-mode) or `133` (without) — which hands the page ~519 or ~577 CSS px instead of 480.
 
-On the **Pro 120**, the 750×1334 screen at the usual devicePixelRatio 2 gives roughly a
-375×667 page: **taller than the 86, and narrower.** That has two consequences worth planning
-around.
+The **Pro 120** ships at density 240, i.e. `devicePixelRatio` 1.5, so its 750×1334 screen
+becomes roughly a **500×889** page in portrait and **889×500** in landscape. Measured on a unit
+running an override of 280 (dpr 1.75), `screen` reported **763×429** in landscape. Both are a
+long way from the 86.
 
-- **More room down the page.** Three 200px cards fit where the 86 took two. Card `height`
-  goes up to 660 in the editor, and YAML has never been capped at all.
-- **Less room across it.** 375 CSS px is below the 86's 480, so the three-across grids on the
-  button, switch and status cards are tighter, not roomier. `columns: 2` is often the better
-  read on a 120 even though the screen is bigger.
+The consequence is the opposite of what the spec sheet suggests. The 120 is not just taller —
+**it is much wider in CSS pixels than the 86**, 500 or more against 480, and getting on for
+900 across in landscape. Cards have more room in both directions, so raise `height` rather
+than leaving Pro 86 values in place and wondering why the page looks empty. The editor's
+spinner now goes to 900; YAML has never been capped at all.
+
+The three-across grids on the button, switch and status cards stay capped at three even though
+the width is there. That ceiling is about hitboxes and legibility at arm's length, not pixels.
 
 The Pro 120 also rotates, which the 86 does not. Nothing in the cards is orientation-aware and
-nothing needs to be — but a page tuned for 375×667 overflows in landscape, so pick an
+nothing needs to be — but a page laid out for 500×889 overflows at 889×500, so pick an
 orientation and lay out for it, or keep a view per orientation.
 
 `dev/bench.html` renders the rack at any of the three geometries — there are panel buttons at
 the top of the page, or `?panel=120` / `?panel=120l` straight in the URL.
+
+### A note on the browser baseline
+
+The cards target Chromium 108, which is the floor: the minimum the HA Companion app needs on
+Android 8.1. It is not what every panel runs. A Pro 120 measured for this repo reported
+**WebView 138**, with `color-mix()` and `dvh` both supported. The floor stays where it is,
+because Android System WebView updates through the Play Store and a panel that has never had
+one is still a panel this has to work on — but if your own probe reports a recent WebView, the
+card is not what is holding your dashboard back.
 
 ## Licence
 

@@ -7,8 +7,10 @@ Guidance for Claude Code when working in this repository.
 A HACS-installable Lovelace plugin: thirteen custom cards (plus one config-only element) for
 the **Sonoff NSPanel Pro**, both sizes — the **Pro 86** (square 480×480, Rockchip PX30) and the
 **Pro 120** (4.7″ 750×1334, Rockchip RK3326S). Both are 2 GB / Mali-G31 / Android 8.1, so the
-performance rules below are not per-model: they hold on both. The 120 is taller, narrower in
-CSS pixels, and rotates. Distributed as a single JavaScript file that Home Assistant loads as
+performance rules below are not per-model: they hold on both. The 120 is bigger in *both*
+directions once density is applied — roughly 500×889 at its factory density of 240 — and it
+rotates. Do not reason from the raw resolutions: density decides the CSS page, and it varies
+per unit. Distributed as a single JavaScript file that Home Assistant loads as
 a module resource. The same card configs are rendered natively by the sibling Flutter app.
 
 Cards, in two families:
@@ -34,8 +36,9 @@ hacs.json                  HACS manifest (points at the filename above)
 README.md                  user-facing docs: options tables, YAML examples, install steps
 .github/workflows/         HACS validation + `node --check dist/nspanel-cards.js`
 dev/bench.html             preview bench: mock hass + an ha-icon stub, renders the real
-                           bundle outside Home Assistant. ?panel=120 / ?panel=120l switch
-                           the frame to the Pro 120; default is the Pro 86's 480x480
+                           bundle outside Home Assistant. ?panel=120 (500x889) and
+                           ?panel=120l (889x500) switch the frame to the Pro 120;
+                           default is the Pro 86's 480x480
 dev/editor.html            harness for the GUI editor: stubs ha-form, shows the emitted
                            config-changed payload, and runs the option sync check
 dev/kiosk-mock.js          fake HA websocket for kiosk/index.html?mock=1 (its alarm arms without a

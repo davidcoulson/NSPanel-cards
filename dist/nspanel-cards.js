@@ -1,8 +1,9 @@
 /*!
  * nspanel-cards - Lovelace cards built for the Sonoff NSPanel Pro:
  * the Pro 86 (3.95" 480x480, PX30) and the Pro 120 (4.7" 750x1334, RK3326S).
- * Same Mali-G31, same 2 GB, same Android 8.1 WebView - so every performance
- * rule below holds on both. The 120 is simply taller, and it rotates.
+ * Same Mali-G31, same 2 GB, same Android 8.1 - so every performance rule below
+ * holds on both. The 120 is bigger in every direction once density is taken
+ * into account, and it rotates.
  *
  * Cards in this bundle:
  *   custom:nspanel-light-card    brightness, drag anywhere, long-press for more
@@ -2671,10 +2672,9 @@ class NsPanelStatusCard extends NsInfoCard {
     return { entities: [], only_problems: false, columns: 2, all_clear: 'All clear' };
   }
 
-  /* 1, 2 or 3 across. More than 3 on a panel this narrow is a list of things
-     you cannot read, let alone hit - and the Pro 120 is narrower still in CSS
-     pixels than the Pro 86, so this ceiling is not one the bigger screen
-     lifts. */
+  /* 1, 2 or 3 across. More than 3 on a Pro 86's 480px page is a list of things
+     you cannot read, let alone hit. A Pro 120 has the width to carry more, but
+     the hitboxes are the point, not the pixels, so the ceiling stays. */
   get _columns() {
     return clamp(Math.round(this._config.columns) || 2, 1, 3);
   }
@@ -3672,9 +3672,14 @@ class NsPanelProbeCard extends HTMLElement {
 
     /* Named off the physical resolution rather than the user agent: both panels
        ship the same Android 8.1 build and their UA strings do not tell them
-       apart. Landscape counts - the Pro 120 rotates, the Pro 86 does not. */
-    const pw = Math.round(window.innerWidth * window.devicePixelRatio);
-    const ph = Math.round(window.innerHeight * window.devicePixelRatio);
+       apart (a Pro 120 reports ro.product.model=px30_evb, an unrenamed Rockchip
+       BSP string, so that is no help either). Taken from screen rather than the
+       viewport because a browser's own chrome comes off innerHeight and would
+       drag the number below any tolerance; screen is also density-independent,
+       where the CSS viewport moves with `wm density`. Landscape counts - the
+       Pro 120 rotates, the Pro 86 does not. */
+    const pw = Math.round(window.screen.width * window.devicePixelRatio);
+    const ph = Math.round(window.screen.height * window.devicePixelRatio);
     const panel = (w, h) => {
       const near = (a, b) => Math.abs(a - b) <= 24;
       if (near(w, 480) && near(h, 480)) return 'NSPanel Pro 86';
@@ -3885,11 +3890,12 @@ const ENTITY_FIELD = { entity: { required: true, selector: { entity: {} } } };
 
 /* The tallest card the GUI will offer. This is a panel height, not a card
    limit: 480 was the Pro 86's whole screen, and a card that filled it was the
-   most anyone could ask for. The Pro 120 is taller, so the ceiling moved with
-   it. The runtime never clamped `height` - it interpolates the number straight
-   into --ns-height - so YAML above the old cap already worked and still does;
-   only the spinner in the editor stopped short. */
-const MAX_CARD_HEIGHT = 660;
+   most anyone could ask for. A Pro 120 at its factory density of 240 (dpr 1.5)
+   gets a 500x889 page in portrait, so the ceiling moved to cover that. The
+   runtime never clamped `height` - it interpolates the number straight into
+   --ns-height - so YAML above the old cap already worked and still does; only
+   the spinner in the editor stopped short. */
+const MAX_CARD_HEIGHT = 900;
 
 /* The options every card takes. The entity row is prepended per card, because
    its picker is filtered to that card's domain. */

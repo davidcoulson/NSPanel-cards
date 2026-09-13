@@ -1,12 +1,16 @@
 # NSPanel Cards
 
-Lovelace cards built for one specific piece of hardware: the **Sonoff NSPanel Pro 86** — the
-3.95″ 480×480 square wall panel.
+Lovelace cards built for one specific piece of hardware: the **Sonoff NSPanel Pro**, in both
+sizes — the 3.95″ 480×480 square **Pro 86**, and the 4.7″ 750×1334 **Pro 120**.
 
-The panel runs a Rockchip PX30 with 2 GB of RAM and a Mali-G31, behind Android 8.1. That is
-2018-class silicon. The usual card packs are built for phones, and on this hardware their
-sliders lag, their hitboxes are small and their text is tiny. Everything here is shaped by
-the constraint.
+Whichever one you have, it is a quad-core Cortex-A35 Rockchip (PX30 on the 86, RK3326S on the
+120) with 2 GB of RAM and a Mali-G31, behind Android 8.1. That is 2018-class silicon. The
+usual card packs are built for phones, and on this hardware their sliders lag, their hitboxes
+are small and their text is tiny. Everything here is shaped by the constraint.
+
+The two panels differ in shape, not in what they can afford to run, so the cards are the same
+on both. What changes is how you lay them out — see
+[Sizing for your panel](#sizing-for-your-panel).
 
 <table>
 <tr>
@@ -649,7 +653,7 @@ every minute; the panel can take it, but it is one more thing running.
 | `title` | the entity's friendly name | what the card calls it |
 | `name` | — | the older spelling of `title`; still works |
 | `icon` | domain default | |
-| `height` | `200` | card height in px |
+| `height` | `200` | card height in px; the editor's spinner stops at 660, YAML does not |
 | `accent` | amber / sky | any hex |
 | `presets` | 3 sensible ones | max 4 shown on the card |
 | `show_presets` | `true` | |
@@ -810,12 +814,31 @@ has no more-info dialog, and knows nothing about the rest of Home Assistant.
 
 ## Sizing for your panel
 
-The panel is 480 physical pixels, but Android density decides how many **CSS** pixels the page
-gets. Stock is often not 160 dpi, and the community fix is `adb shell wm density 148` (with
+**Measure first.** The panel's physical resolution is not the number the page gets: Android
+density decides how many **CSS** pixels a card is laid out in, and the panels do not ship at
+160 dpi. Drop `custom:nspanel-probe-card` on a dashboard once and read `viewport` and `panel`
+straight off the glass, then set `height` to suit. Delete it afterwards; it is a tool, not
+furniture.
+
+On the **Pro 86**, stock density is commonly changed with `adb shell wm density 148` (with
 kiosk-mode) or `133` (without) — which hands the page ~519 or ~577 CSS px instead of 480.
 
-Drop `custom:nspanel-probe-card` on a dashboard once and read the real numbers off the glass,
-then set `height` to suit. Delete it afterwards; it is a tool, not furniture.
+On the **Pro 120**, the 750×1334 screen at the usual devicePixelRatio 2 gives roughly a
+375×667 page: **taller than the 86, and narrower.** That has two consequences worth planning
+around.
+
+- **More room down the page.** Three 200px cards fit where the 86 took two. Card `height`
+  goes up to 660 in the editor, and YAML has never been capped at all.
+- **Less room across it.** 375 CSS px is below the 86's 480, so the three-across grids on the
+  button, switch and status cards are tighter, not roomier. `columns: 2` is often the better
+  read on a 120 even though the screen is bigger.
+
+The Pro 120 also rotates, which the 86 does not. Nothing in the cards is orientation-aware and
+nothing needs to be — but a page tuned for 375×667 overflows in landscape, so pick an
+orientation and lay out for it, or keep a view per orientation.
+
+`dev/bench.html` renders the rack at any of the three geometries — there are panel buttons at
+the top of the page, or `?panel=120` / `?panel=120l` straight in the URL.
 
 ## Licence
 

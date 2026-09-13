@@ -1,5 +1,8 @@
 /*!
- * nspanel-cards - Lovelace cards built for the Sonoff NSPanel Pro 86 (480x480)
+ * nspanel-cards - Lovelace cards built for the Sonoff NSPanel Pro:
+ * the Pro 86 (3.95" 480x480, PX30) and the Pro 120 (4.7" 750x1334, RK3326S).
+ * Same Mali-G31, same 2 GB, same Android 8.1 WebView - so every performance
+ * rule below holds on both. The 120 is simply taller, and it rotates.
  *
  * Cards in this bundle:
  *   custom:nspanel-light-card    brightness, drag anywhere, long-press for more
@@ -1723,7 +1726,7 @@ class NsPanelSensorCard extends NsInfoCard {
 /* ================================================================== *
  * Sensors card - two to four readings side by side
  *
- * The density card. Four separate sensor cards do not fit a 480px page; one
+ * The density card. Four separate sensor cards do not fit a Pro 86 page; one
  * of these does, without shrinking any of the numbers below legible.
  * ================================================================== */
 
@@ -2668,8 +2671,10 @@ class NsPanelStatusCard extends NsInfoCard {
     return { entities: [], only_problems: false, columns: 2, all_clear: 'All clear' };
   }
 
-  /* 1, 2 or 3 across. More than 3 on a 480px panel is a list of things you
-     cannot read, let alone hit. */
+  /* 1, 2 or 3 across. More than 3 on a panel this narrow is a list of things
+     you cannot read, let alone hit - and the Pro 120 is narrower still in CSS
+     pixels than the Pro 86, so this ceiling is not one the bigger screen
+     lifts. */
   get _columns() {
     return clamp(Math.round(this._config.columns) || 2, 1, 3);
   }
@@ -3665,11 +3670,24 @@ class NsPanelProbeCard extends HTMLElement {
       try { return CSS.supports(prop, val); } catch (e) { return false; }
     };
 
+    /* Named off the physical resolution rather than the user agent: both panels
+       ship the same Android 8.1 build and their UA strings do not tell them
+       apart. Landscape counts - the Pro 120 rotates, the Pro 86 does not. */
+    const pw = Math.round(window.innerWidth * window.devicePixelRatio);
+    const ph = Math.round(window.innerHeight * window.devicePixelRatio);
+    const panel = (w, h) => {
+      const near = (a, b) => Math.abs(a - b) <= 24;
+      if (near(w, 480) && near(h, 480)) return 'NSPanel Pro 86';
+      if (near(w, 750) && near(h, 1334)) return 'NSPanel Pro 120 (portrait)';
+      if (near(w, 1334) && near(h, 750)) return 'NSPanel Pro 120 (landscape)';
+      return 'not a known panel';
+    };
+
     const rows = [
       ['viewport', `${window.innerWidth} x ${window.innerHeight} CSS px`],
       ['devicePixelRatio', String(window.devicePixelRatio)],
-      ['physical', `${Math.round(window.innerWidth * window.devicePixelRatio)} x ` +
-        `${Math.round(window.innerHeight * window.devicePixelRatio)} device px`],
+      ['physical', `${pw} x ${ph} device px`],
+      ['panel', panel(pw, ph)],
       ['chromium', `${chrome} (${wv})`],
       ['touch points', String(navigator.maxTouchPoints)],
       ['cores', String(navigator.hardwareConcurrency || '?')],
@@ -3865,6 +3883,14 @@ const PRESET_FIELDS = {
 };
 const ENTITY_FIELD = { entity: { required: true, selector: { entity: {} } } };
 
+/* The tallest card the GUI will offer. This is a panel height, not a card
+   limit: 480 was the Pro 86's whole screen, and a card that filled it was the
+   most anyone could ask for. The Pro 120 is taller, so the ceiling moved with
+   it. The runtime never clamped `height` - it interpolates the number straight
+   into --ns-height - so YAML above the old cap already worked and still does;
+   only the spinner in the editor stopped short. */
+const MAX_CARD_HEIGHT = 660;
+
 /* The options every card takes. The entity row is prepended per card, because
    its picker is filtered to that card's domain. */
 const SHARED_SCHEMA = [
@@ -3872,7 +3898,7 @@ const SHARED_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
@@ -4006,7 +4032,7 @@ const INFO_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
@@ -4082,7 +4108,7 @@ const CLOCK_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
@@ -4139,7 +4165,7 @@ const BUTTON_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
@@ -4171,7 +4197,7 @@ const SWITCH_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
@@ -4203,7 +4229,7 @@ const ALARM_SCHEMA = [
   {
     name: '', type: 'grid', schema: [
       { name: 'icon', selector: { icon: {} } },
-      { name: 'height', selector: { number: { min: 60, max: 480, step: 2, mode: 'box' } } },
+      { name: 'height', selector: { number: { min: 60, max: MAX_CARD_HEIGHT, step: 2, mode: 'box' } } },
     ],
   },
   { name: 'accent', selector: { text: {} } },
